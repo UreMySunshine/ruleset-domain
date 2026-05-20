@@ -3,3 +3,4 @@ payload:
   # 精确匹配特定域名
 
   # 匹配包含该后缀的所有子域名（如 xxx.jiushuyun.com, www.jiushuyun.com）
+  DOMAIN-PREFIX steampowered.com
