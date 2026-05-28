@@ -1,10 +1,13 @@
 #!name=My Custom Rules
 #!desc=自定义直连和代理规则集
 
-[Rule Set]
-direct-domain = https://raw.githubusercontent.com/UreMySunshine/ruleset-domain/refs/heads/main/surge-direct-domain.yaml
-proxy-domain = https://raw.githubusercontent.com/UreMySunshine/ruleset-domain/refs/heads/main/surge-proxy-domain.yaml
-
 [Rule]
-RULE-SET,direct-domain,DIRECT
-RULE-SET,proxy-domain,Proxy
+DOMAIN,wufanai.com,DIRECT
+DOMAIN,it-ai.fineres.com,DIRECT
+DOMAIN-SUFFIX,jiushuyun.com,DIRECT
+DOMAIN-SUFFIX,feishu.cn,DIRECT
+DOMAIN-SUFFIX,fineres.com,DIRECT
+DOMAIN-SUFFIX,fanruan.design,DIRECT
+DOMAIN-SUFFIX,steampowered.com,Proxy
+DOMAIN-SUFFIX,multica.com,Proxy
+DOMAIN-SUFFIX,figma.com,Proxy
