@@ -1,8 +1,0 @@
-DOMAIN,wufanai.com
-DOMAIN,it-ai.fineres.com
-
-  # 匹配包含该后缀的所有子域名（如 xxx.jiushuyun.com, www.jiushuyun.com）
-DOMAIN-SUFFIX,jiushuyun.com
-DOMAIN-SUFFIX,feishu.cn
-DOMAIN-SUFFIX,fineres.com
-DOMAIN-SUFFIX,fanruan.design
