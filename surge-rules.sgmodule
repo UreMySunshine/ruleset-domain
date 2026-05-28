@@ -1,0 +1,10 @@
+#!name=My Custom Rules
+#!desc=自定义直连和代理规则集
+
+[Rule Set]
+direct-domain = https://raw.githubusercontent.com/UreMySunshine/ruleset-domain/refs/heads/main/surge-direct-domain.yaml
+proxy-domain = https://raw.githubusercontent.com/UreMySunshine/ruleset-domain/refs/heads/main/surge-proxy-domain.yaml
+
+[Rule]
+RULE-SET,direct-domain,DIRECT
+RULE-SET,proxy-domain,Proxy
