@@ -1,9 +1,6 @@
 #!name=Kira Custom Rules
 #!desc=自定义直连和代理规则集
 
-[General]
-allow-wifi-access = true
-
 [Rule]
 DOMAIN,wufanai.com,DIRECT
 DOMAIN,it-ai.fineres.com,DIRECT
