@@ -38,7 +38,7 @@ class GasPriceQuery {
      * 解析油价数据
      */
     parsePrices(htmlData) {
-        const priceRegex = /<dl>[\s\S]*?<dt>(.*?油)</dt>[\s\S]*?<dd>(.*?)\(元\)<\/dd>/g;
+        const regPrice = /<dl>[\s\S]+?<dt>(.*油)<\/dt>[\s\S]+?<dd>(.*)\(元\)<\/dd>/gm;
         const prices = [];
         let match;
         while ((match = priceRegex.exec(htmlData)) !== null) {
