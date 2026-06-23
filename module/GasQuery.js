@@ -1,8 +1,7 @@
 /**
- * 实时油价查询脚本 - 优化版
+ * 实时油价查询脚本 - 优化版（含0号柴油 + 地区信息 + Emoji美化）
  * 兼容 Surge、Loon
  * 原作者：@RS0485，修改：@keywos
- * 优化版本 - 新增0号柴油显示
  */
 
 class GasPriceQuery {
@@ -18,15 +17,11 @@ class GasPriceQuery {
 
     /**
      * 获取地区配置
-     * 优先级：参数 > 持久化存储 > 默认值
      */
     getRegion() {
-        // 1. 检查脚本参数
         if (typeof $argument !== 'undefined' && $argument.trim()) {
             return $argument.trim();
         }
-
-        // 2. 检查持久化存储
         try {
             const storedRegion = $persistentStore?.read(this.storageKey);
             if (storedRegion && storedRegion.trim()) {
@@ -36,8 +31,6 @@ class GasPriceQuery {
         } catch (error) {
             console.log('读取存储配置失败:', error.message);
         }
-
-        // 3. 使用默认值
         return this.defaultRegion;
     }
 
@@ -45,10 +38,9 @@ class GasPriceQuery {
      * 解析油价数据
      */
     parsePrices(htmlData) {
-        const priceRegex = /<dl>[\s\S]*?<dt>(.*?油)<\/dt>[\s\S]*?<dd>(.*?)\(元\)<\/dd>/g;
+        const priceRegex = /<dl>[\s\S]*?<dt>(.*?油)</dt>[\s\S]*?<dd>(.*?)\(元\)<\/dd>/g;
         const prices = [];
         let match;
-
         while ((match = priceRegex.exec(htmlData)) !== null) {
             if (match[1] && match[2]) {
                 prices.push({
@@ -57,70 +49,67 @@ class GasPriceQuery {
                 });
             }
         }
-
         return prices;
     }
 
     /**
-     * 解析价格调整信息
+     * 解析地区名称
+     */
+    parseRegionNameFromHtml(htmlData) {
+        try {
+            const titleMatch = htmlData.match(/<title>([\s\S]*?)<\/title>/i);
+            if (titleMatch && titleMatch[1]) {
+                return titleMatch[1]
+                    .replace(/[\r\n]/g, '')
+                    .replace(/(汽油|柴油|油价|查询|最新|今日|价格|信息|\d{4}年?\d*月?\d*日?|_\s*油价查询网?)[\s\S]*$/i, '')
+                    .trim();
+            }
+        } catch (_) {}
+        return '';
+    }
+
+    /**
+     * 解析价格调整信息（带Emoji）
      */
     parseAdjustmentInfo(htmlData) {
         const adjustRegex = /<div class="tishi">\s*<span>(.*?)<\/span><br\/>([\s\S]*?)<br\//;
         const match = htmlData.match(adjustRegex);
-
-        if (!match || match.length < 3) {
-            return '暂无调价信息';
-        }
+        if (!match || match.length < 3) return '暂无调价信息 🤷‍♂️';
 
         try {
-            // 合并两部分信息进行整体解析
             const fullText = `${match[1].trim()} ${match[2].trim()}`;
-            console.log('完整调价信息:', fullText);
-
-            // 解析调价日期 - 匹配常见格式
-            let adjustDate = '';
             
-            // 格式: "下次油价7月29日24时调整"
-            let dateMatch = fullText.match(/(\d{1,2}月\d{1,2}日)(?:\d{1,2}时)?调整/);
+            // 日期
+            let adjustDate = '';
+            let dateMatch = 
+                fullText.match(/(\d{1,2}月\d{1,2}日)(?:\d{1,2}时)?调整/) ||
+                fullText.match(/(\d{4}年\d{1,2}月\d{1,2}日(?:\d{1,2}时)?)/) ||
+                fullText.match(/(\d{1,2}月\d{1,2}日)/);
+            
             if (dateMatch) {
-                adjustDate = `${dateMatch[1]}24时`;
-            } else {
-                // 格式: "2024年7月29日24时"
-                dateMatch = fullText.match(/(\d{4}年\d{1,2}月\d{1,2}日(?:\d{1,2}时)?)/);
-                if (dateMatch) {
-                    adjustDate = dateMatch[1];
-                    if (!adjustDate.includes('时')) {
-                        adjustDate += '24时';
-                    }
-                } else {
-                    // 格式: "7月29日"
-                    dateMatch = fullText.match(/(\d{1,2}月\d{1,2}日)/);
-                    if (dateMatch) {
-                        adjustDate = `${dateMatch[1]}24时`;
-                    }
-                }
+                adjustDate = dateMatch[1] + (dateMatch[1].includes('时') ? '' : '24时');
             }
 
-            // 解析调价趋势和幅度
-            let trend = '';
-            let adjustValue = '';
-            let adjustStatus = '';
-
-            // 判断调价方向
+            // 趋势 Emoji
+            let trendEmoji = '';
+            let trendText = '';
             if (/下降|下调|下跌|降低|降价/.test(fullText)) {
-                trend = '下调';
+                trendEmoji = '📉';
+                trendText = '下调';
             } else if (/上升|上调|上涨|升高|涨价/.test(fullText)) {
-                trend = '上调';
+                trendEmoji = '📈';
+                trendText = '上调';
             }
 
-            // 提取调价幅度
-            const valueMatch1 = fullText.match(/([\d.]+)元\/升\s*[-至到]\s*([\d.]+)元\/升/);
-            if (valueMatch1) {
-                adjustValue = `${valueMatch1[1]}-${valueMatch1[2]}元/升`;
+            // 幅度
+            let adjustValue = '';
+            const rangeMatch = fullText.match(/([\d.]+)元\/升\s*[-至到]\s*([\d.]+)元\/升/);
+            if (rangeMatch) {
+                adjustValue = `${rangeMatch[1]}–${rangeMatch[2]}元/升`;
             } else {
-                const singleLiterMatch = fullText.match(/([\d.]+)元\/升/);
-                if (singleLiterMatch) {
-                    adjustValue = singleLiterMatch[0];
+                const literMatch = fullText.match(/([\d.]+)元\/升/);
+                if (literMatch) {
+                    adjustValue = literMatch[0];
                 } else {
                     const tonMatch = fullText.match(/([\d.]+)元\/吨/);
                     if (tonMatch) {
@@ -129,61 +118,68 @@ class GasPriceQuery {
                 }
             }
 
-            // 检查调价状态 - 只有原文中确实包含"搁浅"才显示
-            if (/搁浅/.test(fullText)) {
-                adjustStatus = '(搁浅)';
-            }
+            // 搁浅状态
+            const isHold = /搁浅/.test(fullText);
+            const holdEmoji = isHold ? '⏸️' : '';
 
-            // 构建最终信息
-            let result = [];
-            
-            if (adjustDate) {
-                result.push(adjustDate);
-            }
-            
-            if (trend && adjustValue) {
-                result.push(`${trend}${adjustValue}${adjustStatus}`);
+            const parts = [];
+            if (adjustDate) parts.push(adjustDate);
+            if (trendEmoji && trendText && adjustValue) {
+                parts.push(`${trendEmoji} ${trendText} ${adjustValue}${holdEmoji ? ' ' + holdEmoji : ''}`);
             } else if (adjustValue) {
-                result.push(`${adjustValue}${adjustStatus}`);
+                parts.push(`${adjustValue}${holdEmoji}`);
             }
 
-            const finalResult = result.join(' ') || '调价信息待更新';
-            console.log('解析结果:', finalResult);
-            
-            return finalResult;
-            
+            return parts.join(' ') || '调价信息待更新 🤔';
         } catch (error) {
             console.log('解析调价信息失败:', error.message);
-            return '调价信息解析失败';
+            return '调价信息解析失败 😵';
         }
     }
 
     /**
-     * 格式化输出内容 - 新增0号柴油显示
+     * 格式化输出内容（带Emoji）
      */
-    formatContent(prices, adjustmentInfo) {
-        // 定义油品显示顺序：92、95、98、0号柴油
-        const displayOrder = ['92号汽油', '95号汽油', '98号汽油', '0号柴油'];
-        
-        // 创建油品名称映射（处理可能的格式差异）
+    formatContent(prices, adjustmentInfo, regionName) {
+        const displayOrder = [
+            { key: '92号汽油', emoji: '🟢' },
+            { key: '95号汽油', emoji: '🔵' },
+            { key: '98号汽油', emoji: '🟣' },
+            { key: '0号柴油', emoji: '🟡' }
+        ];
+
         const priceMap = {};
         prices.forEach(price => {
-            // 标准化油品名称
-            let normalizedName = price.name;
-            if (price.name.includes('92')) normalizedName = '92号汽油';
-            else if (price.name.includes('95')) normalizedName = '95号汽油';
-            else if (price.name.includes('98')) normalizedName = '98号汽油';
-            else if (price.name.includes('0号') || price.name.includes('0#')) normalizedName = '0号柴油';
-            
-            priceMap[normalizedName] = price.value;
+            let key = price.name;
+            if (/92/.test(price.name)) key = '92号汽油';
+            else if (/95/.test(price.name)) key = '95号汽油';
+            else if (/98/.test(price.name)) key = '98号汽油';
+            else if (/0号|0#/.test(price.name)) key = '0号柴油';
+            priceMap[key] = price.value;
         });
 
-        // 按指定顺序构建显示行
-        const priceLines = displayOrder
-            .filter(name => priceMap[name]) // 只显示存在的油品
-            .map(name => `${name.replace('号汽油', '').replace('号柴油', '#柴油')}  ${priceMap[name]}`);
+        const lines = [];
 
-        return [...priceLines, adjustmentInfo].join('\n');
+        // 地区
+        if (regionName) {
+            lines.push(`📍 ${regionName}`);
+            lines.push('');
+        }
+
+        // 油品价格
+        displayOrder.forEach(item => {
+            if (priceMap[item.key]) {
+                const label = item.key
+                    .replace('号汽油', '')
+                    .replace('号柴油', '#柴油');
+                lines.push(`${item.emoji} ${label}  ${priceMap[item.key]}`);
+            }
+        });
+
+        lines.push('');
+        lines.push(adjustmentInfo);
+
+        return lines.join('\n');
     }
 
     /**
@@ -192,13 +188,12 @@ class GasPriceQuery {
     async query() {
         const region = this.getRegion();
         const queryUrl = `${this.baseUrl}/${region}.shtml`;
-
         console.log('查询URL:', queryUrl);
 
         $httpClient.get({
             url: queryUrl,
             headers: this.headers,
-            timeout: 10000 // 10秒超时
+            timeout: 10000
         }, (error, response, data) => {
             this.handleResponse(error, response, data, queryUrl);
         });
@@ -209,52 +204,39 @@ class GasPriceQuery {
      */
     handleResponse(error, response, data, queryUrl) {
         if (error) {
-            console.log('网络请求失败:', error);
-            this.sendError('网络请求失败，请检查网络连接');
+            this.sendError('网络请求失败，请检查网络连接 📡');
             return;
         }
-
         if (!response || response.status !== 200) {
-            console.log('HTTP响应异常:', response?.status);
-            this.sendError('服务器响应异常');
+            this.sendError('服务器响应异常 🚨');
             return;
         }
-
         if (!data || data.trim() === '') {
-            console.log('响应数据为空');
-            this.sendError('获取数据失败');
+            this.sendError('获取数据失败 💔');
             return;
         }
 
         try {
             const prices = this.parsePrices(data);
-            
             if (prices.length === 0) {
-                console.log('未能解析到油价数据');
-                this.sendError('数据解析失败，可能网站结构已变更');
+                this.sendError('数据解析失败，可能网站结构已变更 🏗️');
                 return;
             }
 
-            // 检查是否有0号柴油
-            const hasDiesel = prices.some(p => p.name.includes('0号') || p.name.includes('0#'));
-            console.log(`获取到${prices.length}条油价记录${hasDiesel ? '，包含0号柴油' : ''}`);
-
+            const regionName = this.parseRegionNameFromHtml(data);
             const adjustmentInfo = this.parseAdjustmentInfo(data);
-            const content = this.formatContent(prices, adjustmentInfo);
+            const content = this.formatContent(prices, adjustmentInfo, regionName);
 
-            const result = {
-                title: '今日油价',
+            $done({
+                title: regionName ? `今日油价 · ${regionName}` : '今日油价 ⛽️',
                 content: content,
                 icon: 'fuelpump.fill',
                 'icon-color': '#CA3A05'
-            };
-
-            console.log('查询成功，返回结果');
-            $done(result);
+            });
 
         } catch (parseError) {
             console.log('数据处理失败:', parseError.message);
-            this.sendError('数据处理失败');
+            this.sendError('数据处理失败 💻');
         }
     }
 
@@ -262,24 +244,22 @@ class GasPriceQuery {
      * 发送错误信息
      */
     sendError(message) {
-        const errorResult = {
-            title: '油价查询失败',
+        $done({
+            title: '油价查询失败 😢',
             content: message,
             icon: 'exclamationmark.triangle.fill',
             'icon-color': '#FF3B30'
-        };
-        $done(errorResult);
+        });
     }
 }
 
 // 执行查询
 try {
-    const gasPrice = new GasPriceQuery();
-    gasPrice.query();
+    new GasPriceQuery().query();
 } catch (error) {
     console.log('脚本执行失败:', error.message);
     $done({
-        title: '油价查询失败',
+        title: '油价查询失败 😵',
         content: '脚本执行异常',
         icon: 'exclamationmark.triangle.fill',
         'icon-color': '#FF3B30'
