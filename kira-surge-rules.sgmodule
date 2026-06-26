@@ -3,7 +3,6 @@
 
 [Rule]
 DOMAIN,wufanai.com,DIRECT
-DOMAIN,it-ai.fineres.com,DIRECT
 DOMAIN-SUFFIX,jiushuyun.com,DIRECT
 DOMAIN-SUFFIX,feishu.cn,DIRECT
 DOMAIN-SUFFIX,fineres.com,DIRECT
